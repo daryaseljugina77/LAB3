@@ -40,3 +40,4 @@ tree.bin
 # Editor files
 *.swp
 *~
+build-final/
