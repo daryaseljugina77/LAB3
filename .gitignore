@@ -1,0 +1,42 @@
+# CMake
+build/
+build-coverage/
+
+# Compiled files
+*.o
+*.a
+*.so
+*.gcda
+*.gcno
+*.gcov
+
+# Executable files
+/main
+/main_check
+
+# Coverage
+coverage.info
+coverage_filtered.info
+coverage-html/
+
+# Temporary serialization files
+array.txt
+array.bin
+flist.txt
+flist.bin
+dlist.txt
+dlist.bin
+stack.txt
+stack.bin
+queue.txt
+queue.bin
+chain.txt
+chain.bin
+cuckoo.txt
+cuckoo.bin
+tree.txt
+tree.bin
+
+# Editor files
+*.swp
+*~

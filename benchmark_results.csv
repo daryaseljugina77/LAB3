@@ -1,0 +1,24 @@
+2026-11-23T16:09:22+07:00
+Running ./build/benchmark_test
+Run on (4 X 2300 MHz CPU s)
+Load Average: 1.27, 0.53, 0.45
+***WARNING*** Library was built as DEBUG. Timings may be affected.
+name,iterations,real_time,cpu_time,time_unit,bytes_per_second,items_per_second,label,error_occurred,error_message
+"BM_ArrayPush/100",27232,4871.22,4592.18,ns,,,,,
+"BM_ArrayPush/500",7185,19078.3,18996.7,ns,,,,,
+"BM_FListPushFront/100",13262,9481.72,9438.51,ns,,,,,
+"BM_FListPushFront/500",2806,50984.3,50711.7,ns,,,,,
+"BM_DListPushBack/100",14782,9360.56,9325.85,ns,,,,,
+"BM_DListPushBack/500",2710,50704.5,50486.5,ns,,,,,
+"BM_StackPush/100",14170,9987.83,9939.04,ns,,,,,
+"BM_StackPush/500",2496,49610,49404.9,ns,,,,,
+"BM_QueuePush/100",14440,10163.3,10120.9,ns,,,,,
+"BM_QueuePush/500",2616,49512.5,49320.5,ns,,,,,
+"BM_ChainHashAdd/100",7315,18867.7,18802.5,ns,,,,,
+"BM_ChainHashAdd/500",1053,105637,105148,ns,,,,,
+"BM_ChainHashContains",2836202,48.3336,48.1479,ns,,,,,
+"BM_CuckooHashAdd",672041,195.648,194.933,ns,,,,,
+"BM_CuckooHashContains",18648232,7.56559,7.53466,ns,,,,,
+"BM_CompleteTreeInsert/100",5979,20747,20660.5,ns,,,,,
+"BM_CompleteTreeInsert/500",599,180833,179818,ns,,,,,
+"BM_CompleteTreeFind",90757,1544.89,1537.57,ns,,,,,
