@@ -1,0 +1,5 @@
+*.txt
+*.bin
+coverage.out
+coverage.html
+*.test
