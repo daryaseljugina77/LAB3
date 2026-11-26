@@ -103,9 +103,11 @@ func saveText(w io.Writer, data any) error {
 		if _, err := fmt.Fprintf(w, "%d %d\n", len(v.buckets), v.count); err != nil {
 			return err
 		}
-		for _, key := range v.Keys() {
-			if _, err := fmt.Fprintln(w, key); err != nil {
-				return err
+		for _, head := range v.buckets {
+			for p := head; p != nil; p = p.next {
+				if _, err := fmt.Fprintf(w, "%q %q\n", p.key, p.value); err != nil {
+					return err
+				}
 			}
 		}
 		return nil
@@ -115,12 +117,14 @@ func saveText(w io.Writer, data any) error {
 		}
 		for i := range v.first {
 			if v.first[i].used {
-				if _, err := fmt.Fprintf(w, "1 %d %d\n", i, v.first[i].key); err != nil {
+				e := v.first[i]
+				if _, err := fmt.Fprintf(w, "1 %d %q %q\n", i, e.key, e.value); err != nil {
 					return err
 				}
 			}
 			if v.second[i].used {
-				if _, err := fmt.Fprintf(w, "2 %d %d\n", i, v.second[i].key); err != nil {
+				e := v.second[i]
+				if _, err := fmt.Fprintf(w, "2 %d %q %q\n", i, e.key, e.value); err != nil {
 					return err
 				}
 			}
@@ -149,9 +153,14 @@ func saveBinary(w io.Writer, data any) error {
 		if err := writeInt(w, v.count); err != nil {
 			return err
 		}
-		for _, key := range v.Keys() {
-			if err := writeInt(w, key); err != nil {
-				return err
+		for _, head := range v.buckets {
+			for p := head; p != nil; p = p.next {
+				if err := writeString(w, p.key); err != nil {
+					return err
+				}
+				if err := writeString(w, p.value); err != nil {
+					return err
+				}
 			}
 		}
 	case *CuckooHash:
@@ -172,7 +181,10 @@ func saveBinary(w io.Writer, data any) error {
 				if err := writeInt(w, i); err != nil {
 					return err
 				}
-				if err := writeInt(w, v.first[i].key); err != nil {
+				if err := writeString(w, v.first[i].key); err != nil {
+					return err
+				}
+				if err := writeString(w, v.first[i].value); err != nil {
 					return err
 				}
 			}
@@ -183,7 +195,10 @@ func saveBinary(w io.Writer, data any) error {
 				if err := writeInt(w, i); err != nil {
 					return err
 				}
-				if err := writeInt(w, v.second[i].key); err != nil {
+				if err := writeString(w, v.second[i].key); err != nil {
+					return err
+				}
+				if err := writeString(w, v.second[i].value); err != nil {
 					return err
 				}
 			}
@@ -204,6 +219,18 @@ func saveBinary(w io.Writer, data any) error {
 
 func validCount(n int) bool { return n >= 0 && n <= 1000000 }
 
+func readQuotedFields(input *bufio.Reader, count int) ([]string, error) {
+	line, err := input.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	args, err := parseArgs(strings.TrimSpace(line))
+	if err != nil || len(args) != count {
+		return nil, errors.New("неверная строка сериализации")
+	}
+	return args, nil
+}
+
 func loadText(r io.Reader, data any) error {
 	input := bufio.NewReader(r)
 	switch v := data.(type) {
@@ -213,20 +240,21 @@ func loadText(r io.Reader, data any) error {
 			return err
 		}
 		if cap <= 0 || cap > maxTableCapacity || count < 0 || count > cap {
-			return errors.New("invalid hash table size")
+			return errors.New("неверный размер хеш-таблицы")
 		}
+		_, _ = input.ReadString('\n')
 		temp, _ := NewChainHash(cap)
 		for i := 0; i < count; i++ {
-			var key int
-			if _, err := fmt.Fscan(input, &key); err != nil {
-				return err
-			}
-			added, err := temp.Add(key)
+			args, err := readQuotedFields(input, 2)
 			if err != nil {
 				return err
 			}
-			if !added {
-				return errors.New("duplicate key")
+			// Every pair is quoted. Non-quoted legacy numeric data is rejected.
+			if _, err := temp.Add(args[0], args[1]); err != nil {
+				return err
+			}
+			if temp.count != i+1 {
+				return errors.New("повторяющийся ключ")
 			}
 		}
 		*v = *temp
@@ -238,32 +266,38 @@ func loadText(r io.Reader, data any) error {
 			return err
 		}
 		if cap <= 0 || cap > maxTableCapacity || count < 0 || count > cap*2 {
-			return errors.New("invalid hash table size")
+			return errors.New("неверный размер хеш-таблицы")
 		}
+		_, _ = input.ReadString('\n')
 		temp, _ := NewCuckooHash(cap)
 		temp.seed = seed
 		for i := 0; i < count; i++ {
-			var table, index, key int
-			if _, err := fmt.Fscan(input, &table, &index, &key); err != nil {
+			args, err := readQuotedFields(input, 4)
+			if err != nil {
 				return err
 			}
-			if index < 0 || index >= cap || temp.Contains(key) {
-				return errors.New("invalid cuckoo entry")
+			table, e1 := strconv.Atoi(args[0])
+			index, e2 := strconv.Atoi(args[1])
+			if e1 != nil || e2 != nil || index < 0 || index >= cap {
+				return errors.New("неверная позиция")
 			}
+			key, value := args[2], args[3]
+			if temp.Contains(key) {
+				return errors.New("повторяющийся ключ")
+			}
+			entry := Slot{key: key, value: value, used: true}
 			if table == 1 && index == temp.h1(key, cap, seed) && !temp.first[index].used {
-				temp.first[index] = Slot{key, true}
+				temp.first[index] = entry
 			} else if table == 2 && index == temp.h2(key, cap, seed) && !temp.second[index].used {
-				temp.second[index] = Slot{key, true}
+				temp.second[index] = entry
 			} else {
-				return errors.New("invalid cuckoo entry")
+				return errors.New("неверная позиция")
 			}
 			temp.count++
 		}
 		*v = *temp
 		return nil
 	default:
-		// C++ std::quoted accepts quoted values, including strings with spaces.
-		// Read a line at a time so that an invalid or truncated record fails.
 		var count int
 		if _, err := fmt.Fscan(input, &count); err != nil {
 			return err
@@ -306,20 +340,23 @@ func loadBinary(r io.Reader, data any) error {
 			return err
 		}
 		if cap <= 0 || cap > maxTableCapacity || count < 0 || count > cap {
-			return errors.New("invalid hash table size")
+			return errors.New("неверный размер хеш-таблицы")
 		}
 		temp, _ := NewChainHash(cap)
 		for i := 0; i < count; i++ {
-			key, err := readInt(r)
+			key, err := readString(r)
 			if err != nil {
 				return err
 			}
-			added, err := temp.Add(key)
+			value, err := readString(r)
 			if err != nil {
 				return err
 			}
-			if !added {
-				return errors.New("duplicate key")
+			if _, err = temp.Add(key, value); err != nil {
+				return err
+			}
+			if temp.count != i+1 {
+				return errors.New("повторяющийся ключ")
 			}
 		}
 		*v = *temp
@@ -334,7 +371,7 @@ func loadBinary(r io.Reader, data any) error {
 			return err
 		}
 		if cap <= 0 || cap > maxTableCapacity || count < 0 || count > cap*2 {
-			return errors.New("invalid hash table size")
+			return errors.New("неверный размер хеш-таблицы")
 		}
 		temp, _ := NewCuckooHash(cap)
 		temp.seed = uint32(seed)
@@ -347,19 +384,24 @@ func loadBinary(r io.Reader, data any) error {
 			if err != nil {
 				return err
 			}
-			key, err := readInt(r)
+			key, err := readString(r)
+			if err != nil {
+				return err
+			}
+			value, err := readString(r)
 			if err != nil {
 				return err
 			}
 			if index < 0 || index >= cap || temp.Contains(key) {
-				return errors.New("invalid cuckoo entry")
+				return errors.New("неверная запись таблицы")
 			}
+			entry := Slot{key: key, value: value, used: true}
 			if table == 1 && index == temp.h1(key, cap, temp.seed) && !temp.first[index].used {
-				temp.first[index] = Slot{key, true}
+				temp.first[index] = entry
 			} else if table == 2 && index == temp.h2(key, cap, temp.seed) && !temp.second[index].used {
-				temp.second[index] = Slot{key, true}
+				temp.second[index] = entry
 			} else {
-				return errors.New("invalid cuckoo entry")
+				return errors.New("неверная запись таблицы")
 			}
 			temp.count++
 		}

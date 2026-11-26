@@ -113,66 +113,55 @@ static void BM_ChainHashAdd(benchmark::State& state) {
 
     for (auto _ : state) {
         ChainHash table;
-
         for (int i = 0; i < n; i++) {
-            table.add(i);
+            table.add(to_string(i), "значение" + to_string(i));
         }
-
         benchmark::DoNotOptimize(&table);
     }
 }
-
 BENCHMARK(BM_ChainHashAdd)->Arg(100)->Arg(500);
-
 
 static void BM_ChainHashContains(benchmark::State& state) {
     ChainHash table;
-
     for (int i = 0; i < 100; i++) {
-        table.add(i);
+        table.add(to_string(i), "значение" + to_string(i));
     }
 
     for (auto _ : state) {
-        bool found = table.contains(50);
-
+        string value;
+        bool found = table.find("50", value);
         benchmark::DoNotOptimize(found);
+        benchmark::DoNotOptimize(value);
     }
 }
-
 BENCHMARK(BM_ChainHashContains);
-
 
 // Хеширование кукушки
 
 static void BM_CuckooHashAdd(benchmark::State& state) {
     for (auto _ : state) {
         CuckooHash table;
-
-        table.add(10);
-        table.add(111);
-        table.add(212);
-
+        table.add("10", "первое");
+        table.add("111", "второе");
+        table.add("212", "третье");
         benchmark::DoNotOptimize(&table);
     }
 }
-
 BENCHMARK(BM_CuckooHashAdd);
-
 
 static void BM_CuckooHashContains(benchmark::State& state) {
     CuckooHash table;
-
-    table.add(10);
-    table.add(111);
-    table.add(212);
+    table.add("10", "первое");
+    table.add("111", "второе");
+    table.add("212", "третье");
 
     for (auto _ : state) {
-        bool found = table.contains(111);
-
+        string value;
+        bool found = table.find("111", value);
         benchmark::DoNotOptimize(found);
+        benchmark::DoNotOptimize(value);
     }
 }
-
 BENCHMARK(BM_CuckooHashContains);
 
 

@@ -217,9 +217,9 @@ func handlePushPop(p pushPopOps, args []string) bool {
 }
 
 type hashOps interface {
-	Add(int) (bool, error)
-	Remove(int) bool
-	Contains(int) bool
+	Add(string, string) (bool, error)
+	Remove(string) bool
+	Find(string) (string, bool)
 	Print()
 	PrintTable()
 	Clear()
@@ -239,19 +239,25 @@ func handleHash(h hashOps, args []string) (bool, error) {
 			return true, nil
 		}
 	}
-	key, ok := readIndex(args, 1)
-	if ok && len(args) == 2 {
+	if len(args) == 3 && args[0] == "add" {
+		added, err := h.Add(args[1], args[2])
+		return added || err == nil, err // Updating a value must also be saved.
+	}
+	if len(args) == 2 {
 		switch args[0] {
-		case "add":
-			return h.Add(key)
 		case "remove":
-			return h.Remove(key), nil
-		case "contains":
-			fmt.Println(h.Contains(key))
+			return h.Remove(args[1]), nil
+		case "find":
+			value, found := h.Find(args[1])
+			if found {
+				fmt.Println("Значение:", value)
+			} else {
+				fmt.Println("Ключ не найден")
+			}
 			return false, nil
 		}
 	}
-	fmt.Println("Unknown command or invalid arguments")
+	fmt.Println("Неизвестная команда или неверные аргументы")
 	return false, nil
 }
 
@@ -387,10 +393,10 @@ func main() {
 			runSession(reader, &Queue{}, name, "push, pop, print, clear, back")
 		case "chain":
 			h, _ := NewChainHash(101)
-			runSession(reader, h, name, "add, remove, contains, print, table, clear, back")
+			runSession(reader, h, name, "add <ключ> <значение>, find <ключ>, remove <ключ>, print, table, clear, back")
 		case "cuckoo":
 			h, _ := NewCuckooHash(101)
-			runSession(reader, h, name, "add, remove, contains, print, table, clear, back")
+			runSession(reader, h, name, "add <ключ> <значение>, find <ключ>, remove <ключ>, print, table, clear, back")
 		case "tree":
 			runSession(reader, &CompleteTree{}, name, "insert, find, complete, size, pre, in, post, level, print, clear, back")
 		case "":

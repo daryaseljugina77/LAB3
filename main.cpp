@@ -190,17 +190,28 @@ bool handlePushPop(Container& data, const string& cmd, istringstream& in) {
 
 template <typename Hash>
 bool handleHash(Hash& table, const string& cmd, istringstream& in) {
-    int key;
+    string key;
+    string value;
 
-    if (cmd == "add" && in >> key) {
-        return table.add(key);
+    if (cmd == "add" && (in >> quoted(key) >> quoted(value))) {
+        table.add(key, value);
+        return true;
     }
-    if (cmd == "remove" && in >> key) {
-        return table.remove(key);
+    if (cmd == "find" && (in >> quoted(key))) {
+        if (table.find(key, value)) {
+            cout << "Значение: " << value << endl;
+        }
+        else {
+            cout << "Ключ не найден" << endl;
+        }
+        return false;
     }
-    if (cmd == "contains" && in >> key) {
+    if (cmd == "contains" && (in >> quoted(key))) {
         cout << boolalpha << table.contains(key) << endl;
         return false;
+    }
+    if (cmd == "remove" && (in >> quoted(key))) {
+        return table.remove(key);
     }
     if (cmd == "print") {
         table.print(cout);
@@ -215,8 +226,7 @@ bool handleHash(Hash& table, const string& cmd, istringstream& in) {
         table.clear();
         return true;
     }
-
-    cout << "Unknown command or invalid arguments" << endl;
+    cout << "Неизвестная команда или неверные аргументы" << endl;
     return false;
 }
 
@@ -351,11 +361,11 @@ int main() {
         }
         else if (name == "chain") {
             ChainHash data;
-            runSession(data, "chain", "add, remove, contains, print, table, clear, back", handleHash<ChainHash>);
+            runSession(data, "chain", "add ключ значение, find ключ, contains ключ, remove ключ, print, table, clear, back", handleHash<ChainHash>);
         }
         else if (name == "cuckoo") {
             CuckooHash data;
-            runSession(data, "cuckoo", "add, remove, contains, print, table, clear, back", handleHash<CuckooHash>);
+            runSession(data, "cuckoo", "add ключ значение, find ключ, contains ключ, remove ключ, print, table, clear, back", handleHash<CuckooHash>);
         }
         else if (name == "tree") {
             CompleteTree data;

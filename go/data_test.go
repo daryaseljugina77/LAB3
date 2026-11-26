@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -209,74 +210,91 @@ func TestCompleteTree(t *testing.T) {
 
 func TestChainHash(t *testing.T) {
 	if _, err := NewChainHash(0); err == nil {
-		t.Fatal("invalid cap")
+		t.Fatal("invalid capacity")
 	}
 	h, _ := NewChainHash(3)
-	if h.Contains(1) || h.Remove(1) {
+	if _, ok := h.Find("missing"); ok || h.Remove("missing") {
 		t.Fatal("empty")
 	}
-	for _, key := range []int{10, 111, 212, -5, 1, 0} {
-		ok, err := h.Add(key)
-		if err != nil || !ok {
-			t.Fatal(err)
+	pairs := map[string]string{"10": "десять", "111": "сто одиннадцать", "212": "двести двенадцать", "-5": "минус пять", "": "", "Hello world": "Иванова Мария"}
+	for key, value := range pairs {
+		added, err := h.Add(key, value)
+		if err != nil || !added {
+			t.Fatal("add", key, err)
 		}
 	}
-	if ok, _ := h.Add(111); ok {
-		t.Fatal("duplicate")
-	}
-	if !h.Contains(-5) || !h.Contains(212) || !h.Remove(212) || h.Remove(212) {
-		t.Fatal("lookup")
-	}
-	h.Print()
-	h.PrintTable()
-	h.Clear()
-	h.PrintTable()
-	if h.Contains(10) || h.count != 0 {
-		t.Fatal("clear")
-	}
-	if FoldHash(1234567) != 1+234+567 {
-		t.Fatal("folding")
-	}
-}
-
-func TestCuckooHash(t *testing.T) {
-	if _, err := NewCuckooHash(0); err == nil {
-		t.Fatal("invalid cap")
-	}
-	h, _ := NewCuckooHash(3)
-	if h.Contains(10) || h.Remove(10) {
-		t.Fatal("empty")
-	}
-	keys := []int{10, 111, 212, -5, 1, 0, 1000, 4001, 907, 101, 303, 404}
-	for _, key := range keys {
-		ok, err := h.Add(key)
-		if err != nil || !ok {
-			t.Fatalf("add %d: %v", key, err)
+	for key, expected := range pairs {
+		got, found := h.Find(key)
+		if !found || got != expected {
+			t.Fatalf("find %q: %q, %t", key, got, found)
 		}
 	}
-	if ok, _ := h.Add(10); ok {
-		t.Fatal("duplicate")
+	if added, err := h.Add("111", "обновлено"); err != nil || added {
+		t.Fatal("update", err)
 	}
-	for _, key := range keys {
-		if !h.Contains(key) {
-			t.Fatalf("missing %d", key)
-		}
+	if got, ok := h.Find("111"); !ok || got != "обновлено" {
+		t.Fatal("updated value")
 	}
-	if !h.Remove(10) || h.Remove(10) || h.Contains(10) {
+	if !h.Remove("212") || h.Remove("212") {
 		t.Fatal("remove")
 	}
 	h.Print()
 	h.PrintTable()
 	h.Clear()
 	h.PrintTable()
-	if h.Contains(111) || h.count != 0 {
+	if h.Contains("10") || h.count != 0 {
 		t.Fatal("clear")
 	}
-	h2, _ := NewCuckooHash(101)
-	h2.Add(10)
-	h2.Add(111)
-	h2.Remove(111)
-	h2.PrintTable()
+}
+
+func TestCuckooHash(t *testing.T) {
+	if _, err := NewCuckooHash(0); err == nil {
+		t.Fatal("invalid capacity")
+	}
+	h, _ := NewCuckooHash(3)
+	if _, ok := h.Find("10"); ok || h.Remove("10") {
+		t.Fatal("empty")
+	}
+	pairs := map[string]string{}
+	for i := 0; i < 140; i++ {
+		key, value := fmt.Sprint(i), fmt.Sprintf("значение %d", i)
+		pairs[key] = value
+		added, err := h.Add(key, value)
+		if err != nil || !added {
+			t.Fatalf("add %s: %v", key, err)
+		}
+	}
+	pairs[""] = "пустой ключ"
+	if _, err := h.Add("", "пустой ключ"); err != nil {
+		t.Fatal(err)
+	}
+	pairs["имя с пробелами"] = "Иванова Мария"
+	if _, err := h.Add("имя с пробелами", "Иванова Мария"); err != nil {
+		t.Fatal(err)
+	}
+	for key, expected := range pairs {
+		got, found := h.Find(key)
+		if !found || got != expected {
+			t.Fatalf("missing %q: %q", key, got)
+		}
+	}
+	count := h.count
+	if added, err := h.Add("10", "новое значение"); err != nil || added || h.count != count {
+		t.Fatal("update", err)
+	}
+	if got, ok := h.Find("10"); !ok || got != "новое значение" {
+		t.Fatal("update value")
+	}
+	if !h.Remove("10") || h.Remove("10") || h.Contains("10") {
+		t.Fatal("remove")
+	}
+	h.Print()
+	h.PrintTable()
+	h.Clear()
+	h.PrintTable()
+	if h.Contains("111") || h.count != 0 {
+		t.Fatal("clear")
+	}
 }
 
 func TestSerializationRoundtrip(t *testing.T) {
@@ -292,8 +310,18 @@ func TestSerializationRoundtrip(t *testing.T) {
 		{"stack", func() any { p := &Stack{}; p.Push("A"); p.Push("Hello world"); return p }(), func() any { return &Stack{} }, "Hello world"},
 		{"queue", func() any { p := &Queue{}; p.Push("A"); p.Push("Hello world"); return p }(), func() any { return &Queue{} }, "Hello world"},
 		{"tree", func() any { p := &CompleteTree{}; p.Insert("A"); p.Insert("Hello world"); return p }(), func() any { return &CompleteTree{} }, "Hello world"},
-		{"chain", func() any { p, _ := NewChainHash(101); p.Add(10); p.Add(-5); return p }(), func() any { p, _ := NewChainHash(101); return p }, ""},
-		{"cuckoo", func() any { p, _ := NewCuckooHash(101); p.Add(10); p.Add(-5); return p }(), func() any { p, _ := NewCuckooHash(101); return p }, ""},
+		{"chain", func() any {
+			p, _ := NewChainHash(101)
+			p.Add("student", "Иванова")
+			p.Add("group", "АБС525")
+			return p
+		}(), func() any { p, _ := NewChainHash(101); return p }, ""},
+		{"cuckoo", func() any {
+			p, _ := NewCuckooHash(101)
+			p.Add("student", "Иванова")
+			p.Add("group", "АБС525")
+			return p
+		}(), func() any { p, _ := NewCuckooHash(101); return p }, ""},
 	}
 	for _, tc := range objects {
 		t.Run(tc.name, func(t *testing.T) {
@@ -322,11 +350,11 @@ func TestSerializationRoundtrip(t *testing.T) {
 				}
 				switch p := target.(type) {
 				case *ChainHash:
-					if !p.Contains(10) || !p.Contains(-5) {
+					if v, ok := p.Find("student"); !ok || v != "Иванова" {
 						t.Fatal("chain roundtrip")
 					}
 				case *CuckooHash:
-					if !p.Contains(10) || !p.Contains(-5) {
+					if v, ok := p.Find("student"); !ok || v != "Иванова" {
 						t.Fatal("cuckoo roundtrip")
 					}
 				}
@@ -452,7 +480,7 @@ func TestHandleCommands(t *testing.T) {
 		}
 	}
 	for _, h := range []hashOps{func() hashOps { p, _ := NewChainHash(101); return p }(), func() hashOps { p, _ := NewCuckooHash(101); return p }()} {
-		for _, args := range [][]string{{"add", "10"}, {"contains", "10"}, {"print"}, {"table"}, {"remove", "10"}, {"clear"}, {"unknown"}} {
+		for _, args := range [][]string{{"add", "student", "Иванова"}, {"add", "student", "Петрова"}, {"find", "student"}, {"print"}, {"table"}, {"remove", "student"}, {"clear"}, {"unknown"}} {
 			handleHash(h, args)
 		}
 	}

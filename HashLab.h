@@ -1,18 +1,26 @@
 #ifndef HASHLAB_H
 #define HASHLAB_H
 
-#include "FList.h"
+#include <string>
 #include <iosfwd>
 
-unsigned int foldHash(unsigned int key);
+unsigned int foldHash(const std::string& key);
 
 class ChainHash {
 private:
-    FNode** buckets;
+    struct HashNode {
+        std::string key;
+        std::string value;
+        HashNode* next;
+
+        HashNode(const std::string& k, const std::string& v);
+    };
+
+    HashNode** buckets;
     int capacity;
     int count;
 
-    int index(int key) const;
+    int index(const std::string& key) const;
     void grow();
 
 public:
@@ -22,18 +30,17 @@ public:
     ChainHash(const ChainHash&) = delete;
     ChainHash& operator=(const ChainHash&) = delete;
 
-    bool contains(int key) const;
-    bool add(int key);
-    bool remove(int key);
+    bool add(const std::string& key, const std::string& value);
+    bool find(const std::string& key, std::string& value) const;
+    bool contains(const std::string& key) const;
+    bool remove(const std::string& key);
 
     void clear();
-
     void print(std::ostream& out) const;
     void printTable(std::ostream& out) const;
 
     void saveText(std::ostream& out) const;
     void loadText(std::istream& in);
-
     void saveBinary(std::ostream& out) const;
     void loadBinary(std::istream& in);
 };
@@ -41,29 +48,21 @@ public:
 class CuckooHash {
 private:
     struct Slot {
-        int key;
-        bool used;
+        std::string key;
+        std::string value;
+        bool used = false;
     };
 
     Slot* first;
     Slot* second;
-
     int capacity;
     int count;
     unsigned int seed;
 
-    int h1(int key, int cap, unsigned int salt) const;
-    int h2(int key, int cap, unsigned int salt) const;
-
-    bool place(
-        int key,
-        Slot* a,
-        Slot* b,
-        int cap,
-        unsigned int salt
-    ) const;
-
-    void rebuild(int extraKey);
+    int h1(const std::string& key, int cap, unsigned int salt) const;
+    int h2(const std::string& key, int cap, unsigned int salt) const;
+    bool place(Slot item, Slot* a, Slot* b, int cap, unsigned int salt) const;
+    void rebuild(const std::string& key, const std::string& value);
 
 public:
     explicit CuckooHash(int cap = 101);
@@ -72,18 +71,17 @@ public:
     CuckooHash(const CuckooHash&) = delete;
     CuckooHash& operator=(const CuckooHash&) = delete;
 
-    bool contains(int key) const;
-    bool add(int key);
-    bool remove(int key);
+    bool add(const std::string& key, const std::string& value);
+    bool find(const std::string& key, std::string& value) const;
+    bool contains(const std::string& key) const;
+    bool remove(const std::string& key);
 
     void clear();
-
     void print(std::ostream& out) const;
     void printTable(std::ostream& out) const;
 
     void saveText(std::ostream& out) const;
     void loadText(std::istream& in);
-
     void saveBinary(std::ostream& out) const;
     void loadBinary(std::istream& in);
 };

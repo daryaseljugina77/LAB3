@@ -947,85 +947,96 @@ TEST(QueueTest, InvalidBinaryData) {
     EXPECT_EQ(value, "Original");
 }
 
-// Тестирование метода цепочек
-
+// Тесты хеш-таблицы методом цепочек
 TEST(ChainHashTest, EmptyTable) {
     ChainHash table;
-
-    EXPECT_FALSE(table.contains(10));
-    EXPECT_FALSE(table.remove(10));
+    string value;
+    EXPECT_FALSE(table.find("нет", value));
+    EXPECT_FALSE(table.remove("нет"));
 }
 
-TEST(ChainHashTest, AddAndContains) {
+TEST(ChainHashTest, StringValues) {
     ChainHash table;
-
-    EXPECT_TRUE(table.add(10));
-    EXPECT_TRUE(table.add(20));
-    EXPECT_TRUE(table.add(-5));
-
-    EXPECT_TRUE(table.contains(10));
-    EXPECT_TRUE(table.contains(20));
-    EXPECT_TRUE(table.contains(-5));
-
-    EXPECT_FALSE(table.contains(100));
+    string value;
+    EXPECT_TRUE(table.add("студент", "Иванова"));
+    EXPECT_TRUE(table.add("группа", "АБС 525"));
+    EXPECT_TRUE(table.find("студент", value));
+    EXPECT_EQ(value, "Иванова");
+    EXPECT_TRUE(table.find("группа", value));
+    EXPECT_EQ(value, "АБС 525");
+    EXPECT_FALSE(table.find("неизвестно", value));
 }
 
-TEST(ChainHashTest, DuplicateKeys) {
+TEST(ChainHashTest, UpdateValue) {
     ChainHash table;
-
-    EXPECT_TRUE(table.add(10));
-    EXPECT_FALSE(table.add(10));
-
-    EXPECT_TRUE(table.contains(10));
+    string value;
+    EXPECT_TRUE(table.add("имя", "Анна"));
+    EXPECT_FALSE(table.add("имя", "Мария"));
+    EXPECT_TRUE(table.find("имя", value));
+    EXPECT_EQ(value, "Мария");
 }
 
-TEST(ChainHashTest, CollisionsAndRemoval) {
-    ChainHash table(101);
+TEST(ChainHashTest, EmptyValueAndSpaces) {
+    ChainHash table;
+    string value;
+    EXPECT_TRUE(table.add("ключ с пробелом", ""));
+    EXPECT_TRUE(table.find("ключ с пробелом", value));
+    EXPECT_EQ(value, "");
+    EXPECT_TRUE(table.add("", "пустой ключ"));
+    EXPECT_TRUE(table.find("", value));
+    EXPECT_EQ(value, "пустой ключ");
+}
 
-    EXPECT_TRUE(table.add(10));
-    EXPECT_TRUE(table.add(111));
-    EXPECT_TRUE(table.add(212));
+TEST(ChainHashTest, RemoveAndClear) {
+    ChainHash table;
+    string value;
+    table.add("первый", "1");
+    table.add("второй", "2");
+    EXPECT_TRUE(table.remove("первый"));
+    EXPECT_FALSE(table.find("первый", value));
+    EXPECT_FALSE(table.remove("первый"));
+    EXPECT_TRUE(table.find("второй", value));
+    EXPECT_EQ(value, "2");
+    table.clear();
+    EXPECT_FALSE(table.find("второй", value));
+    EXPECT_TRUE(table.add("новый", "3"));
+    EXPECT_TRUE(table.find("новый", value));
+    EXPECT_EQ(value, "3");
+}
 
-    EXPECT_TRUE(table.contains(10));
-    EXPECT_TRUE(table.contains(111));
-    EXPECT_TRUE(table.contains(212));
-
-    EXPECT_TRUE(table.remove(111));
-
-    EXPECT_FALSE(table.contains(111));
-    EXPECT_TRUE(table.contains(10));
-    EXPECT_TRUE(table.contains(212));
-
-    EXPECT_FALSE(table.remove(111));
+TEST(ChainHashTest, Collisions) {
+    ChainHash table(3);
+    string value;
+    string first;
+    string second;
+    for (int i = 0; i < 100 && second.empty(); i++) {
+        string candidate = "ключ" + to_string(i);
+        if (first.empty()) {
+            first = candidate;
+        }
+        else if (foldHash(first) % 3 == foldHash(candidate) % 3) {
+            second = candidate;
+        }
+    }
+    ASSERT_FALSE(second.empty());
+    table.add(first, "первое");
+    table.add(second, "второе");
+    EXPECT_TRUE(table.find(first, value));
+    EXPECT_EQ(value, "первое");
+    EXPECT_TRUE(table.find(second, value));
+    EXPECT_EQ(value, "второе");
 }
 
 TEST(ChainHashTest, GrowTable) {
     ChainHash table(3);
-
-    EXPECT_TRUE(table.add(1));
-    EXPECT_TRUE(table.add(2));
-    EXPECT_TRUE(table.add(3));
-    EXPECT_TRUE(table.add(4));
-
-    EXPECT_TRUE(table.contains(1));
-    EXPECT_TRUE(table.contains(2));
-    EXPECT_TRUE(table.contains(3));
-    EXPECT_TRUE(table.contains(4));
-}
-
-TEST(ChainHashTest, ClearTable) {
-    ChainHash table;
-
-    table.add(10);
-    table.add(20);
-
-    table.clear();
-
-    EXPECT_FALSE(table.contains(10));
-    EXPECT_FALSE(table.contains(20));
-
-    EXPECT_TRUE(table.add(30));
-    EXPECT_TRUE(table.contains(30));
+    string value;
+    for (int i = 0; i < 60; i++) {
+        EXPECT_TRUE(table.add("ключ" + to_string(i), "значение" + to_string(i)));
+    }
+    for (int i = 0; i < 60; i++) {
+        EXPECT_TRUE(table.find("ключ" + to_string(i), value));
+        EXPECT_EQ(value, "значение" + to_string(i));
+    }
 }
 
 TEST(ChainHashTest, InvalidCapacity) {
@@ -1035,156 +1046,154 @@ TEST(ChainHashTest, InvalidCapacity) {
 
 TEST(ChainHashTest, TextSerialization) {
     ChainHash table;
+    table.add("имя", "Иванова Мария");
+    table.add("пусто", "");
     stringstream stream;
-
-    table.add(10);
-    table.add(111);
-    table.add(212);
-    table.add(-5);
-
     table.saveText(stream);
-
     ChainHash loaded;
     loaded.loadText(stream);
-
-    EXPECT_TRUE(loaded.contains(10));
-    EXPECT_TRUE(loaded.contains(111));
-    EXPECT_TRUE(loaded.contains(212));
-    EXPECT_TRUE(loaded.contains(-5));
-
-    EXPECT_FALSE(loaded.contains(999));
+    string value;
+    EXPECT_TRUE(loaded.find("имя", value));
+    EXPECT_EQ(value, "Иванова Мария");
+    EXPECT_TRUE(loaded.find("пусто", value));
+    EXPECT_EQ(value, "");
 }
 
 TEST(ChainHashTest, BinarySerialization) {
     ChainHash table;
+    table.add("имя", "Иванова Мария");
+    table.add("ключ", "значение");
     stringstream stream(ios::in | ios::out | ios::binary);
-
-    table.add(10);
-    table.add(111);
-    table.add(-5);
-
     table.saveBinary(stream);
-
     ChainHash loaded;
     loaded.loadBinary(stream);
-
-    EXPECT_TRUE(loaded.contains(10));
-    EXPECT_TRUE(loaded.contains(111));
-    EXPECT_TRUE(loaded.contains(-5));
-
-    EXPECT_FALSE(loaded.contains(999));
+    string value;
+    EXPECT_TRUE(loaded.find("имя", value));
+    EXPECT_EQ(value, "Иванова Мария");
+    EXPECT_TRUE(loaded.find("ключ", value));
+    EXPECT_EQ(value, "значение");
 }
 
 TEST(ChainHashTest, InvalidTextData) {
     ChainHash table;
-
-    table.add(10);
-
-    stringstream stream("0 1\n10\n");
-
+    table.add("сохранить", "старое");
+    stringstream stream("0 1\n");
     EXPECT_THROW(table.loadText(stream), runtime_error);
-
-    EXPECT_TRUE(table.contains(10));
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
 }
 
 TEST(ChainHashTest, InvalidBinaryData) {
     ChainHash table;
-
-    table.add(10);
-
+    table.add("сохранить", "старое");
     stringstream stream(ios::in | ios::out | ios::binary);
-
-    int invalidCapacity = 0;
+    int invalid = 0;
     int count = 1;
-
-    stream.write(
-        reinterpret_cast<const char*>(&invalidCapacity),
-        sizeof(invalidCapacity)
-    );
-
-    stream.write(
-        reinterpret_cast<const char*>(&count),
-        sizeof(count)
-    );
-
+    stream.write(reinterpret_cast<const char*>(&invalid), sizeof(invalid));
+    stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
     EXPECT_THROW(table.loadBinary(stream), runtime_error);
-
-    EXPECT_TRUE(table.contains(10));
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
 }
 
-// Тестирование хеширования кукушки
+TEST(ChainHashTest, PrintTable) {
+    ChainHash table;
+    stringstream out;
+    table.add("город", "Новосибирск");
+    table.printTable(out);
+    EXPECT_NE(out.str().find("город"), string::npos);
+    EXPECT_NE(out.str().find("Новосибирск"), string::npos);
+}
 
+TEST(ChainHashTest, DuplicateKeysInTextFile) {
+    ChainHash table;
+    table.add("сохранить", "старое");
+    stringstream stream("101 2\n\"ключ\" \"1\"\n\"ключ\" \"2\"\n");
+    EXPECT_THROW(table.loadText(stream), runtime_error);
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
+}
+
+TEST(ChainHashTest, TruncatedTextFile) {
+    ChainHash table;
+    table.add("сохранить", "старое");
+    stringstream stream("101 2\n\"ключ\" \"1\"\n");
+    EXPECT_THROW(table.loadText(stream), runtime_error);
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
+}
+
+// Тесты кукушкиного хеширования
 TEST(CuckooHashTest, EmptyTable) {
     CuckooHash table;
-
-    EXPECT_FALSE(table.contains(10));
-    EXPECT_FALSE(table.remove(10));
+    string value;
+    EXPECT_FALSE(table.find("нет", value));
+    EXPECT_FALSE(table.remove("нет"));
 }
 
-TEST(CuckooHashTest, AddAndContains) {
+TEST(CuckooHashTest, StringValues) {
     CuckooHash table;
-
-    EXPECT_TRUE(table.add(10));
-    EXPECT_TRUE(table.add(20));
-    EXPECT_TRUE(table.add(-5));
-
-    EXPECT_TRUE(table.contains(10));
-    EXPECT_TRUE(table.contains(20));
-    EXPECT_TRUE(table.contains(-5));
-
-    EXPECT_FALSE(table.contains(100));
+    string value;
+    EXPECT_TRUE(table.add("студент", "Иванова"));
+    EXPECT_TRUE(table.add("группа", "АБС 525"));
+    EXPECT_TRUE(table.find("студент", value));
+    EXPECT_EQ(value, "Иванова");
+    EXPECT_TRUE(table.find("группа", value));
+    EXPECT_EQ(value, "АБС 525");
+    EXPECT_FALSE(table.find("неизвестно", value));
 }
 
-TEST(CuckooHashTest, DuplicateKeys) {
+TEST(CuckooHashTest, UpdateValue) {
     CuckooHash table;
-
-    EXPECT_TRUE(table.add(10));
-    EXPECT_FALSE(table.add(10));
-
-    EXPECT_TRUE(table.contains(10));
+    string value;
+    EXPECT_TRUE(table.add("имя", "Анна"));
+    EXPECT_FALSE(table.add("имя", "Мария"));
+    EXPECT_TRUE(table.find("имя", value));
+    EXPECT_EQ(value, "Мария");
 }
 
-TEST(CuckooHashTest, Collisions) {
+TEST(CuckooHashTest, EmptyValueAndSpaces) {
     CuckooHash table;
-
-    EXPECT_TRUE(table.add(10));
-    EXPECT_TRUE(table.add(111));
-    EXPECT_TRUE(table.add(212));
-
-    EXPECT_TRUE(table.contains(10));
-    EXPECT_TRUE(table.contains(111));
-    EXPECT_TRUE(table.contains(212));
+    string value;
+    EXPECT_TRUE(table.add("ключ с пробелом", ""));
+    EXPECT_TRUE(table.find("ключ с пробелом", value));
+    EXPECT_EQ(value, "");
+    EXPECT_TRUE(table.add("", "пустой ключ"));
+    EXPECT_TRUE(table.find("", value));
+    EXPECT_EQ(value, "пустой ключ");
 }
 
-TEST(CuckooHashTest, RemoveKeys) {
+TEST(CuckooHashTest, RemoveAndClear) {
     CuckooHash table;
-
-    table.add(10);
-    table.add(111);
-    table.add(212);
-
-    EXPECT_TRUE(table.remove(111));
-    EXPECT_FALSE(table.contains(111));
-
-    EXPECT_TRUE(table.contains(10));
-    EXPECT_TRUE(table.contains(212));
-
-    EXPECT_FALSE(table.remove(111));
-}
-
-TEST(CuckooHashTest, ClearTable) {
-    CuckooHash table;
-
-    table.add(10);
-    table.add(20);
-
+    string value;
+    table.add("первый", "1");
+    table.add("второй", "2");
+    EXPECT_TRUE(table.remove("первый"));
+    EXPECT_FALSE(table.find("первый", value));
+    EXPECT_FALSE(table.remove("первый"));
+    EXPECT_TRUE(table.find("второй", value));
+    EXPECT_EQ(value, "2");
     table.clear();
+    EXPECT_FALSE(table.find("второй", value));
+    EXPECT_TRUE(table.add("новый", "3"));
+    EXPECT_TRUE(table.find("новый", value));
+    EXPECT_EQ(value, "3");
+}
 
-    EXPECT_FALSE(table.contains(10));
-    EXPECT_FALSE(table.contains(20));
-
-    EXPECT_TRUE(table.add(30));
-    EXPECT_TRUE(table.contains(30));
+TEST(CuckooHashTest, ManyPairsAndRebuild) {
+    CuckooHash table(3);
+    string value;
+    for (int i = 0; i < 40; i++) {
+        EXPECT_TRUE(table.add("ключ" + to_string(i), "значение" + to_string(i)));
+    }
+    for (int i = 0; i < 40; i++) {
+        EXPECT_TRUE(table.find("ключ" + to_string(i), value));
+        EXPECT_EQ(value, "значение" + to_string(i));
+    }
 }
 
 TEST(CuckooHashTest, InvalidCapacity) {
@@ -1194,87 +1203,87 @@ TEST(CuckooHashTest, InvalidCapacity) {
 
 TEST(CuckooHashTest, TextSerialization) {
     CuckooHash table;
+    table.add("имя", "Иванова Мария");
+    table.add("пусто", "");
     stringstream stream;
-
-    table.add(10);
-    table.add(111);
-    table.add(212);
-    table.add(-5);
-
     table.saveText(stream);
-
     CuckooHash loaded;
     loaded.loadText(stream);
-
-    EXPECT_TRUE(loaded.contains(10));
-    EXPECT_TRUE(loaded.contains(111));
-    EXPECT_TRUE(loaded.contains(212));
-    EXPECT_TRUE(loaded.contains(-5));
-
-    EXPECT_FALSE(loaded.contains(999));
+    string value;
+    EXPECT_TRUE(loaded.find("имя", value));
+    EXPECT_EQ(value, "Иванова Мария");
+    EXPECT_TRUE(loaded.find("пусто", value));
+    EXPECT_EQ(value, "");
 }
 
 TEST(CuckooHashTest, BinarySerialization) {
     CuckooHash table;
+    table.add("имя", "Иванова Мария");
+    table.add("ключ", "значение");
     stringstream stream(ios::in | ios::out | ios::binary);
-
-    table.add(10);
-    table.add(111);
-    table.add(212);
-    table.add(-5);
-
     table.saveBinary(stream);
-
     CuckooHash loaded;
     loaded.loadBinary(stream);
-
-    EXPECT_TRUE(loaded.contains(10));
-    EXPECT_TRUE(loaded.contains(111));
-    EXPECT_TRUE(loaded.contains(212));
-    EXPECT_TRUE(loaded.contains(-5));
+    string value;
+    EXPECT_TRUE(loaded.find("имя", value));
+    EXPECT_EQ(value, "Иванова Мария");
+    EXPECT_TRUE(loaded.find("ключ", value));
+    EXPECT_EQ(value, "значение");
 }
 
 TEST(CuckooHashTest, InvalidTextData) {
     CuckooHash table;
-
-    table.add(10);
-
+    table.add("сохранить", "старое");
     stringstream stream("0 1 0\n");
-
     EXPECT_THROW(table.loadText(stream), runtime_error);
-
-    EXPECT_TRUE(table.contains(10));
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
 }
 
 TEST(CuckooHashTest, InvalidBinaryData) {
     CuckooHash table;
-
-    table.add(10);
-
+    table.add("сохранить", "старое");
     stringstream stream(ios::in | ios::out | ios::binary);
-
-    int invalidCapacity = 0;
+    int invalid = 0;
     int count = 1;
     unsigned int seed = 0;
-
-    stream.write(
-        reinterpret_cast<const char*>(&invalidCapacity),
-        sizeof(invalidCapacity)
-    );
-
-    stream.write(
-        reinterpret_cast<const char*>(&count),
-        sizeof(count)
-    );
-
-    stream.write(
-        reinterpret_cast<const char*>(&seed),
-        sizeof(seed)
-    );
-
+    stream.write(reinterpret_cast<const char*>(&invalid), sizeof(invalid));
+    stream.write(reinterpret_cast<const char*>(&count), sizeof(count));
+    stream.write(reinterpret_cast<const char*>(&seed), sizeof(seed));
     EXPECT_THROW(table.loadBinary(stream), runtime_error);
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
+}
 
-    EXPECT_TRUE(table.contains(10));
+TEST(CuckooHashTest, PrintTable) {
+    CuckooHash table;
+    stringstream out;
+    table.add("город", "Новосибирск");
+    table.printTable(out);
+    EXPECT_NE(out.str().find("город"), string::npos);
+    EXPECT_NE(out.str().find("Новосибирск"), string::npos);
+}
+
+TEST(CuckooHashTest, InvalidHashPosition) {
+    CuckooHash table;
+    table.add("сохранить", "старое");
+    stringstream stream("101 1 0\n1 101 \"ключ\" \"значение\"\n");
+    EXPECT_THROW(table.loadText(stream), runtime_error);
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
+}
+
+TEST(CuckooHashTest, InvalidTableNumber) {
+    CuckooHash table;
+    table.add("сохранить", "старое");
+    stringstream stream("101 1 0\n3 10 \"ключ\" \"значение\"\n");
+    EXPECT_THROW(table.loadText(stream), runtime_error);
+    string value;
+    EXPECT_TRUE(table.find("сохранить", value));
+    EXPECT_EQ(value, "старое");
 }
 
 // Тестирование полного бинарного дерева
@@ -1517,167 +1526,4 @@ TEST(CompleteTreeTest, TruncatedBinaryData) {
 
     EXPECT_EQ(tree.getSize(), 1);
     EXPECT_TRUE(tree.find("Original"));
-}
-
-TEST(ChainHashTest, PrintEmptyTable) {
-    ChainHash table(5);
-    stringstream out;
-
-    table.print(out);
-    EXPECT_TRUE(out.str().empty());
-
-    table.printTable(out);
-
-    EXPECT_NE(out.str().find("(table is empty)"), string::npos);
-    EXPECT_NE(out.str().find("Keys: 0"), string::npos);
-}
-
-TEST(ChainHashTest, PrintFilledTable) {
-    ChainHash table(101);
-    stringstream out;
-
-    table.add(10);
-    table.add(111);
-    table.add(212);
-
-    table.print(out);
-
-    EXPECT_NE(out.str().find("10"), string::npos);
-    EXPECT_NE(out.str().find("111"), string::npos);
-    EXPECT_NE(out.str().find("212"), string::npos);
-
-    out.str("");
-    out.clear();
-
-    table.printTable(out);
-
-    EXPECT_NE(out.str().find("212 -> 111 -> 10"), string::npos);
-    EXPECT_NE(out.str().find("Keys: 3"), string::npos);
-}
-
-TEST(CuckooHashTest, PrintEmptyTable) {
-    CuckooHash table(5);
-    stringstream out;
-
-    table.print(out);
-    EXPECT_TRUE(out.str().empty());
-
-    table.printTable(out);
-
-    EXPECT_NE(out.str().find("(table is empty)"), string::npos);
-    EXPECT_NE(out.str().find("Keys: 0"), string::npos);
-}
-
-TEST(CuckooHashTest, PrintFilledTable) {
-    CuckooHash table(101);
-    stringstream out;
-
-    table.add(10);
-    table.add(111);
-    table.add(212);
-
-    table.print(out);
-
-    EXPECT_NE(out.str().find("10"), string::npos);
-    EXPECT_NE(out.str().find("111"), string::npos);
-    EXPECT_NE(out.str().find("212"), string::npos);
-
-    out.str("");
-    out.clear();
-
-    table.printTable(out);
-
-    EXPECT_NE(out.str().find("Table 1"), string::npos);
-    EXPECT_NE(out.str().find("Table 2"), string::npos);
-    EXPECT_NE(out.str().find("Keys: 3"), string::npos);
-}
-
-TEST(CuckooHashTest, RebuildTable) {
-    CuckooHash table(1);
-
-    EXPECT_TRUE(table.add(10));
-    EXPECT_TRUE(table.add(11));
-    EXPECT_TRUE(table.add(12));
-
-    EXPECT_TRUE(table.contains(10));
-    EXPECT_TRUE(table.contains(11));
-    EXPECT_TRUE(table.contains(12));
-
-    stringstream out;
-    table.printTable(out);
-
-    EXPECT_NE(
-        out.str().find("Keys: 3"),
-        string::npos
-    );
-
-    EXPECT_NE(
-        out.str().find("capacity of each table: 3"),
-        string::npos
-    );
-}
-
-TEST(ChainHashTest, DuplicateKeysInTextFile) {
-    ChainHash table;
-
-    table.add(50);
-
-    stringstream stream(
-        "101 2\n"
-        "10\n"
-        "10\n"
-    );
-
-    EXPECT_THROW(table.loadText(stream), runtime_error);
-
-    EXPECT_TRUE(table.contains(50));
-    EXPECT_FALSE(table.contains(10));
-}
-
-TEST(ChainHashTest, TruncatedTextFile) {
-    ChainHash table;
-
-    table.add(50);
-
-    stringstream stream(
-        "101 3\n"
-        "10\n"
-    );
-
-    EXPECT_THROW(table.loadText(stream), runtime_error);
-
-    EXPECT_TRUE(table.contains(50));
-    EXPECT_FALSE(table.contains(10));
-}
-
-TEST(CuckooHashTest, InvalidHashPosition) {
-    CuckooHash table;
-
-    table.add(50);
-
-    stringstream stream(
-        "101 1 0\n"
-        "1 0 10\n"
-    );
-
-    EXPECT_THROW(table.loadText(stream), runtime_error);
-
-    EXPECT_TRUE(table.contains(50));
-    EXPECT_FALSE(table.contains(10));
-}
-
-TEST(CuckooHashTest, InvalidTableNumber) {
-    CuckooHash table;
-
-    table.add(50);
-
-    stringstream stream(
-        "101 1 0\n"
-        "3 10 10\n"
-    );
-
-    EXPECT_THROW(table.loadText(stream), runtime_error);
-
-    EXPECT_TRUE(table.contains(50));
-    EXPECT_FALSE(table.contains(10));
 }

@@ -71,7 +71,7 @@ func BenchmarkChainHashAdd(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				h, _ := NewChainHash(101)
 				for j := 0; j < n; j++ {
-					h.Add(j)
+					h.Add(fmt.Sprint(j), "value")
 				}
 			}
 		})
@@ -80,25 +80,33 @@ func BenchmarkChainHashAdd(b *testing.B) {
 func BenchmarkChainHashContains(b *testing.B) {
 	h, _ := NewChainHash(101)
 	for i := 0; i < 500; i++ {
-		h.Add(i)
+		h.Add(fmt.Sprint(i), "value")
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		h.Contains(250)
+		value, found := h.Find("250")
+		if !found || value != "value" {
+			b.Fatal("lookup failed")
+		}
 	}
 }
 func BenchmarkCuckooHashAdd(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		h, _ := NewCuckooHash(101)
-		h.Add(10)
+		if _, err := h.Add("student", "Иванова"); err != nil {
+			b.Fatal(err)
+		}
 	}
 }
 func BenchmarkCuckooHashContains(b *testing.B) {
 	h, _ := NewCuckooHash(101)
-	h.Add(10)
+	h.Add("student", "Иванова")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		h.Contains(10)
+		value, found := h.Find("student")
+		if !found || value != "Иванова" {
+			b.Fatal("lookup failed")
+		}
 	}
 }
 func BenchmarkCompleteTreeInsert(b *testing.B) {
